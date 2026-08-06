@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const body = await req.json();
+    console.log("VERIFY PAYMENT BODY:");
+console.log(JSON.stringify(body, null, 2));
 
     const {
       razorpay_order_id,
@@ -75,14 +77,14 @@ export async function POST(req: NextRequest) {
       orderId: order.orderId,
     });
   } catch (error: any) {
-    console.error(error);
+  console.error("FULL ERROR:", error);
+  console.error("STACK:", error?.stack);
 
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message,
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      success: false,
+      message: error?.message,
+    },
+    { status: 500 }
+  );
 }
