@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #050505;
+  color: white;
+  font-family: var(--font-poppins);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-cinzel);
+}
+
+.gold-text {
+  color: #d4af37;
+}
+
+.gold-btn {
+  background: linear-gradient(135deg, #d4af37, #f3d77c);
+  color: black;
+  transition: 0.4s;
+}
+
+.gold-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(212, 175, 55, .45);
+}
+
+.glass {
+  backdrop-filter: blur(20px);
+  background: rgba(0,0,0,.45);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4af37;
+  border-radius: 999px;
+}
