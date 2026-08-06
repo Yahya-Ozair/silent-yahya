@@ -118,7 +118,7 @@ export default function ProductClient({ product }: Props) {
 
               <div className="mt-12 flex flex-col gap-4 sm:flex-row">
 
-               <button
+         <button
   onClick={() =>
     addToCart({
       id: product.id.toString(),
@@ -130,10 +130,9 @@ export default function ProductClient({ product }: Props) {
   }
   className="flex flex-1 items-center justify-center gap-3 rounded-full bg-[#D4AF37] py-4 font-bold text-black transition hover:scale-105"
 >
-                
-                  <ShoppingBag size={22} />
-                  Add To Cart
-                </button>
+  <ShoppingBag size={22} />
+  Add To Cart
+</button>
 
                 <Link
                   href="/checkout"
