@@ -121,13 +121,13 @@ export default function ProductClient({ product }: Props) {
                 <button
                   onClick={() =>
                     addToCart({
-                      id: product.id,
-                      slug: product.slug,
-                      name: product.name,
-                      price: product.price,
-                      image: product.image,
-                    })
-                  }
+  id: product.id.toString(),
+  slug: product.slug,
+  name: product.name,
+  image: product.image,
+  price: product.price,
+})
+
                   className="flex flex-1 items-center justify-center gap-3 rounded-full bg-[#D4AF37] py-4 font-bold text-black transition hover:scale-105"
                 >
                   <ShoppingBag size={22} />
