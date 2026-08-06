@@ -46,7 +46,13 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("========== ORDER ERROR ==========");
-    console.error(error);
+console.error(error);
+console.error(error.message);
+console.error(error.stack);
+
+if (error.errors) {
+  console.error(error.errors);
+}
 
     if (error.errors) {
       console.error("Validation Errors:");
