@@ -47,31 +47,19 @@ console.log(JSON.stringify(body, null, 2));
     }
 
     const order = await Order.create({
-      orderId: generateOrderId(),
-
-      customer,
-
-      address,
-
-      items,
-
-      subtotal,
-
-      shipping,
-
-      total,
-
-      paymentMethod: "ONLINE",
-
-      paymentStatus: "Paid",
-
-      orderStatus: "Pending",
-
-      razorpayOrderId: razorpay_order_id,
-
-      razorpayPaymentId: razorpay_payment_id,
-    });
-
+  orderId: generateOrderId(),
+  customer,
+  address,
+  items,
+  subtotal,
+  shipping,
+  total,
+  paymentMethod: "ONLINE",
+  paymentStatus: "Paid",
+  orderStatus: "Pending",
+  razorpayOrderId: razorpay_order_id,
+  razorpayPaymentId: razorpay_payment_id,
+});
     return NextResponse.json({
       success: true,
       orderId: order.orderId,
@@ -87,4 +75,5 @@ console.log(JSON.stringify(body, null, 2));
     },
     { status: 500 }
   );
+}
 }

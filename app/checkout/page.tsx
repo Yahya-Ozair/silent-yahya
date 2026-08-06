@@ -60,6 +60,7 @@ export default function CheckoutPage() {
     alert("Please fill all required fields.");
     return;
   }
+  
 
   // CASH ON DELIVERY
   if (form.payment === "COD") {
