@@ -118,18 +118,19 @@ export default function ProductClient({ product }: Props) {
 
               <div className="mt-12 flex flex-col gap-4 sm:flex-row">
 
-                <button
-                  onClick={() =>
-                    addToCart({
-  id: product.id.toString(),
-  slug: product.slug,
-  name: product.name,
-  image: product.image,
-  price: product.price,
-})
-
-                  className="flex flex-1 items-center justify-center gap-3 rounded-full bg-[#D4AF37] py-4 font-bold text-black transition hover:scale-105"
-                >
+               <button
+  onClick={() =>
+    addToCart({
+      id: product.id.toString(),
+      slug: product.slug,
+      name: product.name,
+      image: product.image,
+      price: product.price,
+    })
+  }
+  className="flex flex-1 items-center justify-center gap-3 rounded-full bg-[#D4AF37] py-4 font-bold text-black transition hover:scale-105"
+>
+                
                   <ShoppingBag size={22} />
                   Add To Cart
                 </button>
