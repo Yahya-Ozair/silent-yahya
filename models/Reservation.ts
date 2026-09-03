@@ -1,14 +1,11 @@
-import mongoose, {
-  Document,
-  Model,
-  Schema,
-} from "mongoose";
+import mongoose, { Model, Schema, Types } from "mongoose";
 
 export type ReservationStatus =
   | "PENDING"
   | "SECURED"
   | "EXPIRED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "CONFIRMED";
 
 export type ReservationOrderStatus =
   | "Processing"
@@ -23,12 +20,13 @@ export type ReservationPaymentStatus =
   | "Failed"
   | "Refunded";
 
-export interface IReservation extends Document {
+export interface IReservation {
   // ==========================================
   // RELEASE
   // ==========================================
 
-  releaseId: mongoose.Types.ObjectId;
+  _id?: Types.ObjectId;
+  releaseId: Types.ObjectId;
 
   // ==========================================
   // CUSTOMER
@@ -49,8 +47,12 @@ export interface IReservation extends Document {
   country?: string;
 
   // ==========================================
-  // PRODUCT
+  // PRODUCT / VARIANT
   // ==========================================
+
+  variantKey?: string;
+  variantName?: string;
+  variantSku?: string;
 
   price: number;
 
@@ -87,13 +89,6 @@ export interface IReservation extends Document {
   // ==========================================
   // OLD RAZORPAY COMPATIBILITY
   // ==========================================
-  //
-  // These are kept temporarily because some
-  // existing API files still reference them.
-  //
-  // We will remove the old Razorpay routes
-  // properly after the production build passes.
-  //
 
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
@@ -109,211 +104,228 @@ export interface IReservation extends Document {
   // TIMESTAMPS
   // ==========================================
 
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const ReservationSchema =
-  new Schema<IReservation>(
-    {
-      // ======================================
-      // RELEASE
-      // ======================================
+const ReservationSchema = new Schema<IReservation>(
+  {
+    // ======================================
+    // RELEASE
+    // ======================================
 
-      releaseId: {
-        type: Schema.Types.ObjectId,
-        ref: "Release",
-        required: true,
-        index: true,
-      },
-
-      // ======================================
-      // CUSTOMER
-      // ======================================
-
-      name: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      email: {
-        type: String,
-        required: true,
-        trim: true,
-        lowercase: true,
-      },
-
-      phone: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      // ======================================
-      // DELIVERY ADDRESS
-      // ======================================
-
-      address: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      city: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      state: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      pincode: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      country: {
-        type: String,
-        default: "India",
-        trim: true,
-      },
-
-      // ======================================
-      // PRODUCT
-      // ======================================
-
-      price: {
-        type: Number,
-        required: true,
-        default: 999,
-      },
-
-      // ======================================
-      // RESERVATION
-      // ======================================
-
-      status: {
-        type: String,
-        enum: [
-          "PENDING",
-          "SECURED",
-          "EXPIRED",
-          "CANCELLED",
-        ],
-        default: "PENDING",
-        index: true,
-      },
-
-      expiresAt: {
-        type: Date,
-        required: true,
-        index: true,
-      },
-
-      // ======================================
-      // SLOT
-      // ======================================
-
-      slotNumber: {
-        type: Number,
-        default: null,
-      },
-
-      slotName: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      // ======================================
-      // ORDER
-      // ======================================
-
-      orderStatus: {
-        type: String,
-        enum: [
-          "Pending",
-          "Processing",
-          "Shipped",
-          "Delivered",
-          "Cancelled",
-        ],
-        default: "Processing",
-      },
-
-      // ======================================
-      // PAYMENT
-      // ======================================
-
-      paymentStatus: {
-        type: String,
-        enum: [
-          "Pending",
-          "Paid",
-          "Failed",
-          "Refunded",
-        ],
-        default: "Pending",
-      },
-
-      paymentId: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      orderId: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      // ======================================
-      // OLD RAZORPAY FIELDS
-      // ======================================
-      //
-      // Temporary compatibility only.
-      //
-
-      razorpayOrderId: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      razorpayPaymentId: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      razorpaySignature: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      // ======================================
-      // SHIPPING / TRACKING
-      // ======================================
-
-      trackingNumber: {
-        type: String,
-        default: "",
-        trim: true,
-        index: true,
-      },
+    releaseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Release",
+      required: true,
+      index: true,
     },
-    {
-      timestamps: true,
-    }
-  );
+
+    // ======================================
+    // CUSTOMER
+    // ======================================
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+    },
+
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // ======================================
+    // DELIVERY ADDRESS
+    // ======================================
+
+    address: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    city: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    state: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    pincode: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    country: {
+      type: String,
+      default: "India",
+      trim: true,
+    },
+
+    // ======================================
+    // PRODUCT / VARIANT
+    // ======================================
+
+    variantKey: {
+      type: String,
+      default: "",
+      trim: true,
+      index: true,
+    },
+
+    variantName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    variantSku: {
+      type: String,
+      default: "",
+      trim: true,
+      index: true,
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      default: 999,
+    },
+
+    // ======================================
+    // RESERVATION
+    // ======================================
+
+    status: {
+      type: String,
+      enum: [
+        "PENDING",
+        "SECURED",
+        "EXPIRED",
+        "CANCELLED",
+        "CONFIRMED",
+      ],
+      default: "PENDING",
+      index: true,
+    },
+
+    expiresAt: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+
+    // ======================================
+    // SLOT
+    // ======================================
+
+    slotNumber: {
+      type: Number,
+      default: null,
+    },
+
+    slotName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // ======================================
+    // ORDER
+    // ======================================
+
+    orderStatus: {
+      type: String,
+      enum: [
+        "Pending",
+        "Processing",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
+      ],
+      default: "Processing",
+    },
+
+    // ======================================
+    // PAYMENT
+    // ======================================
+
+    paymentStatus: {
+      type: String,
+      enum: [
+        "Pending",
+        "Paid",
+        "Failed",
+        "Refunded",
+      ],
+      default: "Pending",
+    },
+
+    paymentId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    orderId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // ======================================
+    // OLD RAZORPAY COMPATIBILITY
+    // ======================================
+
+    razorpayOrderId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    razorpayPaymentId: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    razorpaySignature: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // ======================================
+    // SHIPPING / TRACKING
+    // ======================================
+
+    trackingNumber: {
+      type: String,
+      default: "",
+      trim: true,
+      index: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 // ==========================================
 // NEXT.JS / MONGOOSE HOT RELOAD PROTECTION

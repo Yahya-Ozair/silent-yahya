@@ -2,19 +2,11 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Release from "@/models/Release";
 import Reservation from "@/models/Reservation";
+import { getHusnainsVariant } from "@/lib/husnainsVariants";
 
-const SLOT_NAMES = [
-  "THE FIRST LIGHT",
-  "THE ORIGIN",
-  "THE SIGNATURE",
-  "THE LEGACY",
-  "THE NOCTURNE",
-  "THE ROYAL",
-  "THE PRIVATE",
-  "THE ARCHIVE",
-  "THE HUSNAIN",
-  "THE SILENT",
-];
+function clean(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 export async function POST(request: Request) {
   try {
@@ -22,111 +14,89 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const {
-      name,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      pincode,
-      country,
-    } = body;
+    // ==========================================
+    // CUSTOMER DETAILS
+    // ==========================================
 
-    /* =========================
-       VALIDATION
-    ========================= */
+    const name = clean(body.name);
+    const email = clean(body.email).toLowerCase();
+    const phone = clean(body.phone);
 
-    if (!name?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Full name is required.",
-        },
-        { status: 400 }
-      );
-    }
+    // ==========================================
+    // DELIVERY ADDRESS
+    // ==========================================
 
-    if (!email?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Email is required.",
-        },
-        { status: 400 }
-      );
-    }
+    const address = clean(body.address);
+    const city = clean(body.city);
+    const state = clean(body.state);
+    const pincode = clean(body.pincode);
+    const country = clean(body.country) || "India";
 
-    if (!phone?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Phone number is required.",
-        },
-        { status: 400 }
-      );
-    }
+    // ==========================================
+    // VARIANT
+    // ==========================================
 
-    if (!address?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Delivery address is required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!city?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "City is required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!state?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "State is required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!pincode?.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Pincode is required.",
-        },
-        { status: 400 }
-      );
-    }
+    const variantKey = clean(body.variantKey);
 
     if (
-      (country || "India") === "India" &&
-      !/^\d{6}$/.test(pincode.trim())
+      !name ||
+      !email ||
+      !phone ||
+      !address ||
+      !city ||
+      !state ||
+      !pincode
     ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Please enter a valid 6-digit pincode.",
+          error:
+            "Please complete all required delivery details.",
         },
         { status: 400 }
       );
     }
 
-    /* =========================
-       FIND LIVE RELEASE
-    ========================= */
+    // ==========================================
+    // PINCODE VALIDATION
+    // ==========================================
+
+    if (!/^\d{6}$/.test(pincode)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Please enter a valid 6-digit Indian pincode.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ==========================================
+    // RESOLVE VARIANT SERVER-SIDE
+    // ==========================================
+
+    const variant = getHusnainsVariant(variantKey);
+
+    if (!variant) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "That edition finish is not available.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ==========================================
+    // FIND LIVE RELEASE
+    // ==========================================
 
     const release = await Release.findOne({
       status: "LIVE",
     }).sort({
+      releasedAt: -1,
       createdAt: -1,
     });
 
@@ -134,272 +104,240 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "There is no active release right now.",
+          error:
+            "The private release is not currently live.",
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
-    /* =========================
-       CLEAN EXPIRED RESERVATIONS
-    ========================= */
+    const now = new Date();
+
+    // ==========================================
+    // EXPIRE OLD PENDING RESERVATIONS
+    // ==========================================
 
     await Reservation.updateMany(
       {
-        releaseId: release._id,
         status: "PENDING",
         expiresAt: {
-          $lte: new Date(),
+          $lte: now,
         },
       },
       {
         $set: {
-          status: "EXPIRED",
+          status: "CANCELLED",
+          orderStatus: "Cancelled",
         },
       }
     );
 
-    /* =========================
-       CHECK AVAILABLE CAPACITY
-    ========================= */
-
-    const securedSlots = Number(
-      release.securedSlots || 0
-    );
+    // ==========================================
+    // TOTAL RELEASE SLOTS
+    // ==========================================
 
     const totalSlots = Number(
       release.totalSlots || 0
     );
 
-    if (securedSlots >= totalSlots) {
+    if (!totalSlots) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Unfortunately, all slots have already been secured.",
-        },
-        { status: 400 }
-      );
-    }
-
-    /*
-      Count active pending reservations too.
-      This prevents multiple people from
-      temporarily taking the same remaining pool.
-    */
-
-    const activePending =
-      await Reservation.countDocuments({
-        releaseId: release._id,
-        status: "PENDING",
-        expiresAt: {
-          $gt: new Date(),
-        },
-      });
-
-    const remainingCapacity =
-      totalSlots -
-      securedSlots -
-      activePending;
-
-    if (remainingCapacity <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "All currently available positions are being held. Please try again shortly.",
+            "No reservation positions are configured.",
         },
         { status: 409 }
       );
     }
 
-    /* =========================
-       FIND NEXT SLOT NUMBER
-    ========================= */
+    // ==========================================
+    // FIND ACTIVE SLOT RESERVATIONS
+    // ==========================================
 
-    const existingReservations =
+    const activeReservations =
       await Reservation.find({
-        releaseId: release._id,
-        slotNumber: {
-          $ne: null,
-        },
+        $or: [
+          {
+            status: {
+              $in: [
+                "SECURED",
+                "CONFIRMED",
+              ],
+            },
+          },
+          {
+            status: "PENDING",
+            expiresAt: {
+              $gt: now,
+            },
+          },
+        ],
       })
         .select("slotNumber")
         .lean();
 
-    const usedNumbers = new Set<number>();
+    // ==========================================
+    // BUILD USED SLOT SET
+    // ==========================================
 
-    for (const item of existingReservations) {
+    const usedSlots = new Set<number>();
+
+    for (const item of activeReservations) {
+      const slot = Number(item.slotNumber);
+
       if (
-        typeof item.slotNumber === "number"
+        Number.isInteger(slot) &&
+        slot > 0
       ) {
-        usedNumbers.add(item.slotNumber);
+        usedSlots.add(slot);
       }
     }
 
-    let slotNumber = 1;
+    // ==========================================
+    // FIND FIRST AVAILABLE SLOT
+    // ==========================================
 
-    while (
-      usedNumbers.has(slotNumber) &&
-      slotNumber <= totalSlots
+    let slotNumber = 0;
+
+    for (
+      let candidate = 1;
+      candidate <= totalSlots;
+      candidate += 1
     ) {
-      slotNumber++;
+      if (!usedSlots.has(candidate)) {
+        slotNumber = candidate;
+        break;
+      }
     }
 
-    if (slotNumber > totalSlots) {
+    if (!slotNumber) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "No individual slot is currently available.",
+            "No reservation positions are currently available.",
         },
         { status: 409 }
       );
     }
 
-    /* =========================
-       SLOT NAME
-    ========================= */
+    // ==========================================
+    // RESERVATION HOLD
+    // ==========================================
 
     const slotName =
-      `HY-${String(slotNumber).padStart(
-        2,
-        "0"
-      )} — ${
-        SLOT_NAMES[
-          (slotNumber - 1) %
-            SLOT_NAMES.length
-        ]
-      }`;
-
-    /* =========================
-       10 MINUTE HOLD
-    ========================= */
+      `HY-${String(slotNumber).padStart(2, "0")} — ${variant.shortName}`;
 
     const expiresAt = new Date(
-      Date.now() + 10 * 60 * 1000
+      now.getTime() + 10 * 60 * 1000
     );
 
-    /* =========================
-       CREATE RESERVATION
-    ========================= */
+    // ==========================================
+    // CREATE RESERVATION
+    // ==========================================
 
     const reservation =
       await Reservation.create({
         releaseId: release._id,
 
-        name: name.trim(),
+        name,
+        email,
+        phone,
 
-        email: email.trim(),
+        address,
+        city,
+        state,
+        pincode,
+        country,
 
-        phone: phone.trim(),
+        // Variant information
+        variantKey: variant.key,
+        variantName: variant.name,
+        variantSku: variant.sku,
 
-        address: address.trim(),
-
-        city: city.trim(),
-
-        state: state.trim(),
-
-        pincode: pincode.trim(),
-
-        country:
-          country?.trim() || "India",
-
-        price: Number(
-          release.price || 999
-        ),
+        // IMPORTANT:
+        // Price comes from the server-side
+        // variant configuration.
+        price: variant.price,
 
         status: "PENDING",
-
-        orderStatus: "Processing",
 
         expiresAt,
 
         slotNumber,
-
         slotName,
 
+        orderStatus: "Processing",
         paymentStatus: "Pending",
       });
 
-    /* =========================
-       SUCCESS
-    ========================= */
+    // ==========================================
+    // RESPONSE
+    // ==========================================
 
-    return NextResponse.json(
-      {
-        success: true,
+    return NextResponse.json({
+      success: true,
 
-        message:
-          "Slot temporarily reserved.",
+      reservation: {
+        id: reservation._id?.toString(),
 
-        reservation: {
-          id: reservation._id.toString(),
+        releaseId:
+          reservation.releaseId?.toString(),
 
-          releaseId:
-            reservation.releaseId.toString(),
+        name: reservation.name,
+        email: reservation.email,
+        phone: reservation.phone,
 
-          name: reservation.name,
+        address: reservation.address,
+        city: reservation.city,
+        state: reservation.state,
+        pincode: reservation.pincode,
+        country: reservation.country,
 
-          email: reservation.email,
+        variantKey:
+          reservation.variantKey,
 
-          phone: reservation.phone,
+        variantName:
+          reservation.variantName,
 
-          address:
-            reservation.address || "",
+        variantSku:
+          reservation.variantSku,
 
-          city:
-            reservation.city || "",
+        price:
+          reservation.price,
 
-          state:
-            reservation.state || "",
+        status:
+          reservation.status,
 
-          pincode:
-            reservation.pincode || "",
+        orderStatus:
+          reservation.orderStatus,
 
-          country:
-            reservation.country || "India",
+        paymentStatus:
+          reservation.paymentStatus,
 
-          price:
-            reservation.price ||
-            release.price ||
-            999,
+        expiresAt:
+          reservation.expiresAt,
 
-          status:
-            reservation.status,
+        slotNumber:
+          reservation.slotNumber,
 
-          orderStatus:
-            reservation.orderStatus,
+        slotName:
+          reservation.slotName,
 
-          paymentStatus:
-            reservation.paymentStatus,
+        releaseName:
+          release.releaseName,
 
-          expiresAt:
-            reservation.expiresAt,
+        totalSlots:
+          release.totalSlots,
 
-          slotNumber:
-            reservation.slotNumber,
-
-          slotName:
-            reservation.slotName,
-
-          releaseName:
-            release.releaseName,
-
-          totalSlots:
-            release.totalSlots,
-
-          securedSlots:
-            release.securedSlots,
-        },
+        securedSlots:
+          release.securedSlots,
       },
-      {
-        status: 201,
-      }
-    );
-  } catch (error: any) {
+    });
+  } catch (error) {
     console.error(
-      "Reservation creation error:",
+      "POST /api/reservation error:",
       error
     );
 
@@ -407,12 +345,9 @@ export async function POST(request: Request) {
       {
         success: false,
         error:
-          error?.message ||
-          "Unable to create reservation.",
+          "Unable to create your reservation right now.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
